@@ -31,9 +31,9 @@ func BenchmarkEvaluations(b *testing.B) {
 	testLoad.Run()
 
 	for _, fn := range files {
-	    if fn == "benchdata/load.test" {
-	        continue
-	    }
+		if fn == "benchdata/load.test" {
+			continue
+		}
 		// Create swappable storages
 		storageA := &SwappableStorage{}
 		storageB := &SwappableStorage{}
@@ -100,7 +100,8 @@ func (p *SwappableStorage) Close() error {
 	return p.s.Close()
 }
 
-type StubStorage struct {}
+type StubStorage struct{}
+
 func (p *StubStorage) Querier(ctx context.Context, mint, maxt int64) (storage.Querier, error) {
 	return nil, nil
 }

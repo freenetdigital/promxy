@@ -84,7 +84,7 @@ func getProxyStorage(cfg string) *proxystorage.ProxyStorage {
 	return ps
 }
 
-func startAPIForTest(test *promql.Test, listen string) (*http.Server, chan struct{}) {
+func startAPIForTest(storage storage.Storage, listen string) (*http.Server, chan struct{}) {
 	// Start up API server for engine
 	cfgFunc := func() config.Config { return config.DefaultConfig }
 	// Return 503 until ready (for us there isn't much startup, so this might not need to be implemented
@@ -92,7 +92,7 @@ func startAPIForTest(test *promql.Test, listen string) (*http.Server, chan struc
 
 	api := v1.NewAPI(
 		promql.NewEngine(nil, nil, 20, 10*time.Minute),
-		test.Storage(),
+		storage,
 		nil,
 		nil,
 		cfgFunc,
@@ -145,7 +145,7 @@ func TestUpstreamEvaluations(t *testing.T) {
 				}
 
 				// Create API for the storage engine
-				srv, stopChan := startAPIForTest(test, ":8083")
+				srv, stopChan := startAPIForTest(test.Storage(), ":8083")
 
 				ps := getProxyStorage(psConfig)
 				lStorage := &LayeredStorage{ps, test.Storage()}
@@ -182,8 +182,8 @@ func TestEvaluations(t *testing.T) {
 			}
 
 			// Create API for the storage engine
-			srv, stopChan := startAPIForTest(test, ":8083")
-			srv2, stopChan2 := startAPIForTest(test, ":8084")
+			srv, stopChan := startAPIForTest(test.Storage(), ":8083")
+			srv2, stopChan2 := startAPIForTest(test.Storage(), ":8084")
 
 			ps := getProxyStorage(rawDoublePSConfig)
 			lStorage := &LayeredStorage{ps, test.Storage()}
