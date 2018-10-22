@@ -9,8 +9,12 @@ import (
 
 	"net/http"
 	_ "net/http/pprof"
+	"net/url"
 
+	config_util "github.com/prometheus/common/config"
+	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/storage"
+	"github.com/prometheus/prometheus/storage/remote"
 )
 
 func init() {
@@ -42,6 +46,7 @@ func BenchmarkEvaluations(b *testing.B) {
 		srv, stopChan := startAPIForTest(storageA, ":8083")
 		srv2, stopChan2 := startAPIForTest(storageB, ":8084")
 		ps := getProxyStorage(rawDoublePSConfig)
+		psRemoteRead := getProxyStorage(rawDoublePSConfig)
 
 		b.Run(fn, func(b *testing.B) {
 			test, err := newTestFromFile(b, fn)
@@ -51,7 +56,18 @@ func BenchmarkEvaluations(b *testing.B) {
 			origStorage := test.Storage()
 
 			b.Run("direct", func(b *testing.B) {
-				test.SetStorage(testLoad.Storage())
+				srv, stopChan := startAPIForTest(testLoad.Storage(), ":8085")
+				serverURL, _ := url.Parse("http://localhost:8085")
+				client, err := remote.NewClient(1, &remote.ClientConfig{
+					URL:     &config_util.URL{URL: serverURL},
+					Timeout: model.Duration(time.Second),
+				})
+				if err != nil {
+					b.Fatalf("Error creating remote_read client: %v", err)
+				}
+
+				lStorage := &RemoteStorage{remote.QueryableClient(client), testLoad.Storage()}
+				test.SetStorage(lStorage)
 
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
@@ -60,6 +76,11 @@ func BenchmarkEvaluations(b *testing.B) {
 					// will be off since this isn't aggregating
 				}
 				b.StopTimer()
+
+				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+				defer cancel()
+				srv.Shutdown(ctx)
+				<-stopChan
 			})
 
 			b.Run("promxy", func(b *testing.B) {
@@ -68,6 +89,24 @@ func BenchmarkEvaluations(b *testing.B) {
 				storageB.s = testLoad.Storage()
 
 				lStorage := &LayeredStorage{ps, testLoad.Storage()}
+				// Replace the test storage with the promxy one
+				test.SetStorage(lStorage)
+				test.QueryEngine().NodeReplacer = ps.NodeReplacer
+				b.ResetTimer()
+
+				for i := 0; i < b.N; i++ {
+					test.Run()
+				}
+
+				b.StopTimer()
+			})
+
+			b.Run("promxy_remoteread", func(b *testing.B) {
+				// set the storage
+				storageA.s = testLoad.Storage()
+				storageB.s = testLoad.Storage()
+
+				lStorage := &LayeredStorage{psRemoteRead, testLoad.Storage()}
 				// Replace the test storage with the promxy one
 				test.SetStorage(lStorage)
 				test.QueryEngine().NodeReplacer = ps.NodeReplacer
@@ -126,4 +165,23 @@ func (p *StubStorage) Appender() (storage.Appender, error) {
 }
 func (p *StubStorage) Close() error {
 	return nil
+}
+
+type RemoteStorage struct {
+	q           storage.Queryable
+	baseStorage storage.Storage
+}
+
+func (p *RemoteStorage) Querier(ctx context.Context, mint, maxt int64) (storage.Querier, error) {
+	return p.q.Querier(ctx, mint, maxt)
+}
+func (p *RemoteStorage) StartTime() (int64, error) {
+	return p.baseStorage.StartTime()
+}
+
+func (p *RemoteStorage) Appender() (storage.Appender, error) {
+	return p.baseStorage.Appender()
+}
+func (p *RemoteStorage) Close() error {
+	return p.baseStorage.Close()
 }

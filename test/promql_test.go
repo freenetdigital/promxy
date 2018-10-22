@@ -67,6 +67,29 @@ promxy:
           insecure_skip_verify: true
 `
 
+const rawDoublePSConfigRR = `
+promxy:
+  server_groups:
+    - static_configs:
+        - targets:
+          - localhost:8083
+      labels:
+        az: a
+      remote_read: true
+      http_client:
+        tls_config:
+          insecure_skip_verify: true
+    - static_configs:
+        - targets:
+          - localhost:8084
+      labels:
+        az: b
+      remote_read: true
+      http_client:
+        tls_config:
+          insecure_skip_verify: true
+`
+
 func getProxyStorage(cfg string) *proxystorage.ProxyStorage {
 	ps, err := proxystorage.NewProxyStorage()
 	if err != nil {
