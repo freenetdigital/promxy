@@ -109,7 +109,7 @@ func BenchmarkEvaluations(b *testing.B) {
 				lStorage := &LayeredStorage{psRemoteRead, testLoad.Storage()}
 				// Replace the test storage with the promxy one
 				test.SetStorage(lStorage)
-				test.QueryEngine().NodeReplacer = ps.NodeReplacer
+				test.QueryEngine().NodeReplacer = psRemoteRead.NodeReplacer
 				b.ResetTimer()
 
 				for i := 0; i < b.N; i++ {
