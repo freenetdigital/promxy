@@ -44,11 +44,33 @@ func BenchmarkEvaluations(b *testing.B) {
 		ps := getProxyStorage(rawDoublePSConfig)
 
 		b.Run(fn, func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
+
+			b.Run("direct", func(b *testing.B) {
 				test, err := newTestFromFile(b, fn)
 				if err != nil {
 					b.Errorf("error creating test for %s: %s", fn, err)
 				}
+				origStorage := test.Storage()
+				test.SetStorage(testLoad.Storage())
+
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					test.Run()
+					// We specifically don't check the correctness here, since the values
+					// will be off since this isn't aggregating
+				}
+				b.StopTimer()
+				test.SetStorage(origStorage)
+				test.Close()
+			})
+
+			b.Run("promxy", func(b *testing.B) {
+				test, err := newTestFromFile(b, fn)
+				if err != nil {
+					b.Errorf("error creating test for %s: %s", fn, err)
+				}
+
+				origStorage := test.Storage()
 
 				// set the storage
 				storageA.s = testLoad.Storage()
@@ -58,17 +80,16 @@ func BenchmarkEvaluations(b *testing.B) {
 				// Replace the test storage with the promxy one
 				test.SetStorage(lStorage)
 				test.QueryEngine().NodeReplacer = ps.NodeReplacer
-
 				b.ResetTimer()
-				err = test.Run()
-				if err != nil {
-					b.Errorf("error running test %s: %s", fn, err)
-				}
-				b.StopTimer()
-				test.SetStorage(&StubStorage{})
-				test.Close()
-			}
 
+				for i := 0; i < b.N; i++ {
+					test.Run()
+				}
+
+				b.StopTimer()
+				test.SetStorage(origStorage)
+				test.Close()
+			})
 		})
 
 		// stop server
