@@ -9,6 +9,8 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/prometheus/common/model"
 	"github.com/sirupsen/logrus"
+
+        "github.com/prometheus/prometheus/config"
 )
 
 func DoRequest(ctx context.Context, url string, client *http.Client, responseStruct easyjson.Unmarshaler) error {
@@ -32,13 +34,17 @@ func DoRequest(ctx context.Context, url string, client *http.Client, responseStr
 }
 
 // HTTP client for prometheus
-func GetData(ctx context.Context, url string, client *http.Client, labelset model.LabelSet) (model.Value, error) {
+func GetData(ctx context.Context, url string, client *http.Client, labelset model.LabelSet, relabelConfigs []*config.RelabelConfig) (model.Value, error) {
 	promResp := &DataResult{}
 	if err := DoRequest(ctx, url, client, promResp); err == nil {
 		if promResp.Status != promhttputil.StatusSuccess {
 			return nil, fmt.Errorf(promResp.Error)
 		}
 		if err := promhttputil.ValueAddLabelSet(promResp.Data.Result, labelset); err != nil {
+			return nil, err
+		}
+
+		if err := promhttputil.ValueRelabel(promResp.Data.Result, relabelConfigs); err != nil {
 			return nil, err
 		}
 

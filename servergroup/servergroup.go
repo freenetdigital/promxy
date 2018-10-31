@@ -415,7 +415,7 @@ func (s *ServerGroup) GetData(ctx context.Context, path string, inValues url.Val
 		parsedUrl.RawQuery = values.Encode()
 		go func(retChan chan interface{}, stringUrl string) {
 			start := time.Now()
-			result, err := promclient.GetData(childContext, stringUrl, s.Client, state.Labels)
+			result, err := promclient.GetData(childContext, stringUrl, s.Client, state.Labels, s.Cfg.MetricRelabelConfigs)
 			took := time.Now().Sub(start)
 			if err != nil {
 				serverGroupSummary.WithLabelValues(parsedUrl.Host, "getdata", "error").Observe(took.Seconds())

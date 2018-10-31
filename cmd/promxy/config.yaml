@@ -52,3 +52,7 @@ promxy:
       http_client:
         tls_config:
           insecure_skip_verify: true
+      # apply relabel rules on values retrieved from this server_group
+      metric_relabel_configs:
+        - action: labeldrop
+          regex: monitor

@@ -42,6 +42,9 @@ type Config struct {
 	// RelabelConfigs is identical in function and configuration as prometheus'
 	// relabel config for scrape jobs
 	RelabelConfigs []*config.RelabelConfig `yaml:"relabel_configs,omitempty"`
+	// MetricRelabelConfigs is identical in function and configuration as prometheus'
+	// relabel config for metrics after scraping
+	MetricRelabelConfigs []*config.RelabelConfig `yaml:"metric_relabel_configs,omitempty"`
 	// Hosts is a set of ServiceDiscoveryConfig options that allow promxy to discover
 	// all hosts in the server_group
 	Hosts sd_config.ServiceDiscoveryConfig `yaml:",inline"`

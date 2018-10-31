@@ -5,6 +5,9 @@ import (
 	"reflect"
 
 	"github.com/prometheus/common/model"
+
+        "github.com/prometheus/prometheus/config"
+        "github.com/prometheus/prometheus/relabel"
 )
 
 // ValueAddLabelSet adds the labelset `l` to the value `a`
@@ -31,6 +34,42 @@ func ValueAddLabelSet(a model.Value, l model.LabelSet) error {
 
 	return nil
 
+}
+
+// ValueRelabel modifies the labels according to the metric_relabel_configs
+func ValueRelabel(a model.Value, relabelConfigs []*config.RelabelConfig) error {
+	switch aTyped := a.(type) {
+	case model.Vector:
+		for _, item := range aTyped {
+	                err := MetricRelabel(item.Metric, relabelConfigs)
+                        if err != nil {
+                                return err
+                        }
+		}
+
+	case model.Matrix:
+		for _, item := range aTyped {
+			// If the current metric has no labels, set them
+			if item.Metric == nil {
+				item.Metric = model.Metric(model.LabelSet(make(map[model.LabelName]model.LabelValue)))
+			} else {
+		                err := MetricRelabel(item.Metric, relabelConfigs)
+                                if err != nil {
+                                        return err
+                                }
+			}
+		}
+	}
+
+	return nil
+}
+
+// MetricRelabel modifies the labels according to the metric_relabel_configs
+func MetricRelabel(a model.Metric, relabelConfigs []*config.RelabelConfig) error {
+	labelSet := model.LabelSet(a)
+	labelSet = relabel.Process(labelSet, relabelConfigs...)
+        a = model.Metric(labelSet)
+        return nil
 }
 
 // MergeValues merges values `a` and `b` with the given antiAffinityBuffer
